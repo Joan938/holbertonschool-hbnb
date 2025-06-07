@@ -1,2 +1,0 @@
-![High-Level Package Diagram](./high_level_package_diagram.png)
-
