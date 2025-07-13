@@ -1,11 +1,20 @@
 from flask import Flask
-from flask_restx import Api # type: ignore
+from flask_restx import Api  # type: ignore
+from flask_sqlalchemy import SQLAlchemy
+from flask_jwt_extended import JWTManager
+from flask_bcrypt import Bcrypt
 from config import config
+
+# instantiate extensions
+db = SQLAlchemy()
+jwt = JWTManager()
+bcrypt = Bcrypt()
+
+# import namespaces
 from app.api.v1.users import api as users_ns
 from app.api.v1.places import api as places_ns
 from app.api.v1.reviews import api as reviews_ns
 from app.api.v1.amenities import api as amenities_ns
-
 
 def create_app(config_name: str = 'default') -> Flask:
     """
@@ -14,6 +23,11 @@ def create_app(config_name: str = 'default') -> Flask:
     app = Flask(__name__)
     # Load configuration
     app.config.from_object(config[config_name])
+
+    # Initialize extensions
+    db.init_app(app)
+    jwt.init_app(app)
+    bcrypt.init_app(app)
 
     # Initialize API
     api = Api(
