@@ -1,6 +1,5 @@
-# hbnb/app/api/v1/users.py
-
 from flask_restx import Namespace, Resource, fields  # type: ignore
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.services import facade
 
 api = Namespace('users', description='User operations')
@@ -18,7 +17,7 @@ class UserList(Resource):
     @api.response(201, 'User successfully created')
     @api.response(400, 'Email already registered or invalid input data')
     def post(self):
-        """Register a new user"""
+        """Register a new user (Public access)"""
         user_data = api.payload
         if facade.get_user_by_email(user_data['email']):
             return {'error': 'Email already registered'}, 400
@@ -32,7 +31,7 @@ class UserList(Resource):
     @api.response(200, 'List of users retrieved successfully')
     @api.response(404, 'No users found')
     def get(self):
-        """Retrieve all users"""
+        """Retrieve all users (Public access)"""
         users = facade.get_all_users()
         if not users:
             return {'message': 'No users found'}, 404
@@ -51,7 +50,7 @@ class UserResource(Resource):
     @api.response(200, 'User details retrieved successfully')
     @api.response(404, 'User not found')
     def get(self, user_id):
-        """Get user details by ID"""
+        """Get user details by ID (Public access)"""
         user = facade.get_user(user_id)
         if not user:
             return {'error': 'User not found'}, 404
@@ -62,17 +61,35 @@ class UserResource(Resource):
             'email': user.email
         }, 200
 
+    @jwt_required()
     @api.expect(user_model, validate=True)
     @api.response(200, 'User updated successfully')
     @api.response(400, 'Invalid input data')
+    @api.response(401, 'Authentication required')
+    @api.response(403, 'Unauthorized action')
     @api.response(404, 'User not found')
     def put(self, user_id):
-        """Update a user's information"""
+        """Update a user's information (Authentication required - Self only)"""
+        current_user = get_jwt_identity()
+        
+        # Check if the authenticated user is trying to modify their own data
+        if current_user != user_id:
+            return {'error': 'Unauthorized action'}, 403
+        
         user = facade.get_user(user_id)
         if not user:
             return {'error': 'User not found'}, 404
+        
         updated_data = api.payload.copy()
-        updated_data.pop('password', None)  # disallow password changes here
+        
+        # Prevent modification of email and password
+        if 'email' in updated_data or 'password' in updated_data:
+            return {'error': 'You cannot modify email or password'}, 400
+        
+        # Remove these fields if somehow present
+        updated_data.pop('email', None)
+        updated_data.pop('password', None)
+        
         try:
             updated_user = facade.update_user(user_id, updated_data)
             return {

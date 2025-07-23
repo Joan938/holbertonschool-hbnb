@@ -1,47 +1,26 @@
-# hbnb/app/models/user.py
-
-import re
 import uuid
-from app import db, bcrypt
+from werkzeug.security import generate_password_hash, check_password_hash
+from app import db
 
 class User(db.Model):
     __tablename__ = 'users'
+    id = db.Column(db.String(60), primary_key=True, default=lambda: str(uuid.uuid4()))
+    first_name = db.Column(db.String(128), nullable=False)
+    last_name = db.Column(db.String(128), nullable=False)
+    email = db.Column(db.String(128), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
 
-    id = db.Column(db.String(36),
-                   primary_key=True,
-                   default=lambda: str(uuid.uuid4()))
-    first_name = db.Column(db.String(50), nullable=False)
-    last_name  = db.Column(db.String(50), nullable=False)
-    email      = db.Column(db.String(50), unique=True, nullable=False)
-    password   = db.Column(db.String(128), nullable=False)
-    is_admin   = db.Column(db.Boolean, default=False, nullable=False)
+    places = db.relationship('Place', back_populates='user', cascade='all, delete')
+    reviews = db.relationship('Review', back_populates='user', cascade='all, delete')
 
-    def __init__(self, first_name, last_name, email, password, is_admin=False):
-        # Validation
-        if not first_name or not isinstance(first_name, str) or len(first_name) > 50:
-            raise ValueError("Invalid first_name")
-        if not last_name or not isinstance(last_name, str) or len(last_name) > 50:
-            raise ValueError("Invalid last_name")
-        if not email or not isinstance(email, str) or len(email) > 50:
-            raise ValueError("Invalid email")
-        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-            raise ValueError("Invalid email format")
+    @property
+    def password(self):
+        raise AttributeError('password is not a readable attribute')
 
-        # Hash & store the password
-        self.hash_password(password)
+    @password.setter
+    def password(self, plain):
+        self.password_hash = generate_password_hash(plain)
 
-        # Assign the other fields
-        self.first_name = first_name
-        self.last_name  = last_name
-        self.email      = email
-        self.is_admin   = is_admin
-
-    def hash_password(self, plaintext_password: str) -> None:
-        """Hash a plaintext password and store its bcrypt hash."""
-        self.password = bcrypt.generate_password_hash(
-            plaintext_password
-        ).decode('utf-8')
-
-    def verify_password(self, plaintext_password: str) -> bool:
-        """Check a plaintext password against the stored hash."""
-        return bcrypt.check_password_hash(self.password, plaintext_password)
+    def verify_password(self, plain):
+        return check_password_hash(self.password_hash, plain)

@@ -1,33 +1,12 @@
-from app.models.base import BaseModel
+import uuid
+from app import db
 
+class Review(db.Model):
+    __tablename__ = 'reviews'
+    id = db.Column(db.String(60), primary_key=True, default=lambda: str(uuid.uuid4()))
+    place_id = db.Column(db.String(60), db.ForeignKey('places.id'), nullable=False)
+    user_id = db.Column(db.String(60), db.ForeignKey('users.id'), nullable=False)
+    text = db.Column(db.Text, nullable=False)
 
-class Review(BaseModel):
-    def __init__(self, text, rating, place_id, user_id):
-        super().__init__()
-        if not text:
-            raise ValueError("text cannot be empty")
-        if not isinstance(text, str):
-            raise TypeError("text must be a string")
-        self.text = text
-
-        if not isinstance(rating, int):
-            raise TypeError("rating must be an integer")
-        if 1 > rating > 5:
-            raise ValueError("rating must be between 1 - 5")
-        self.rating = rating
-        self.place_id = place_id
-        self.place = self.get_place(self.place_id)
-        self.user_id = user_id
-        self.user = self.get_User(self.user_id)
-
-
-    def get_place(self, id):
-        from app.services import facade
-        place = facade.get_place(id)
-        return place
-    
-
-    def get_User(self, id):
-        from app.services import facade
-        user = facade.get_user(id)
-        return user
+    place = db.relationship('Place', back_populates='reviews')
+    user = db.relationship('User', back_populates='reviews')

@@ -1,4 +1,5 @@
 from flask_restx import Namespace, Resource, fields  # type: ignore
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.services import facade
 
 api = Namespace('places', description='Place operations')
@@ -18,17 +19,38 @@ place_model = api.model('Place', {
 
 @api.route('/')
 class PlaceList(Resource):
+    @jwt_required()
     @api.expect(place_model)
     @api.response(201, 'Place successfully created')
     @api.response(400, 'Invalid input data')
+    @api.response(401, 'Authentication required')
     def post(self):
-        data = api.payload
-        place = facade.create_place(data)
-        return {'id': place.id, 'title': place.title, 'description': place.description, 'price': place.price, 'latitude': place.latitude, 'longitude': place.longitude}, 201
+        """Create a new place (Authentication required)"""
+        current_user = get_jwt_identity()
+        data = api.payload.copy()
+        
+        # Set the owner_id to the authenticated user
+        data['owner_id'] = current_user
+        
+        try:
+            place = facade.create_place(data)
+            return {
+                'id': place.id, 
+                'title': place.title, 
+                'description': place.description, 
+                'price': place.price, 
+                'latitude': place.latitude, 
+                'longitude': place.longitude,
+                'owner_id': place.owner_id
+            }, 201
+        except (ValueError, TypeError) as e:
+            return {'error': str(e)}, 400
 
     @api.response(200, 'List of places retrieved successfully')
+    @api.response(404, 'No places found')
     def get(self):
-        places = facade.place_repo.get_all()
+        """Retrieve all places (Public access)"""
+        places = facade.get_all_places()
         if not places:
             return {'error': 'No places found'}, 404
         return [{'id': p.id, 'title': p.title, 'latitude': p.latitude, 'longitude': p.longitude} for p in places], 200
@@ -38,6 +60,7 @@ class PlaceResource(Resource):
     @api.response(200, 'Place details retrieved successfully')
     @api.response(404, 'Place not found')
     def get(self, place_id):
+        """Get place details by ID (Public access)"""
         place = facade.get_place(place_id)
         if not place:
             return {'error': 'Place not found'}, 404
@@ -50,22 +73,38 @@ class PlaceResource(Resource):
             'owner': {'id': place.owner.id, 'first_name': place.owner.first_name, 'last_name': place.owner.last_name, 'email': place.owner.email} if place.owner else None,
             'amenities': [{'id': a.id, 'name': a.name} for a in place.amenities]
         }, 200
+
+    @jwt_required()
     @api.expect(place_model)
     @api.response(200, 'Place updated successfully')
+    @api.response(403, 'Unauthorized action')
     @api.response(404, 'Place not found')
     @api.response(400, 'Invalid input data')
+    @api.response(401, 'Authentication required')
     def put(self, place_id):
-        data = api.payload
+        """Update a place (Authentication required - Owner only)"""
+        current_user = get_jwt_identity()
         place = facade.get_place(place_id)
+        
         if not place:
             return {'error': 'Place not found'}, 404
-        # update amenities list
-        amenities = [facade.get_amenity(aid) for aid in data.get('amenities', []) if facade.get_amenity(aid)]
-        data['amenities'] = amenities
-        # update owner if provided
-        if 'owner' in data:
-            owner = facade.get_user(data['owner']['id'])
-            data['owner_id'] = owner.id if owner else None
-        facade.update_place(place_id, data)
-        return {'message': 'Place updated successfully'}, 200
-
+        
+        # Check if the authenticated user is the owner
+        if place.owner_id != current_user:
+            return {'error': 'Unauthorized action'}, 403
+        
+        data = api.payload.copy()
+        
+        # Handle amenities if provided
+        if 'amenities' in data:
+            amenities = [facade.get_amenity(aid) for aid in data.get('amenities', []) if facade.get_amenity(aid)]
+            data['amenities'] = amenities
+        
+        # Remove owner from data as it shouldn't be updated
+        data.pop('owner', None)
+        
+        try:
+            facade.update_place(place_id, data)
+            return {'message': 'Place updated successfully'}, 200
+        except (ValueError, TypeError) as e:
+            return {'error': str(e)}, 400

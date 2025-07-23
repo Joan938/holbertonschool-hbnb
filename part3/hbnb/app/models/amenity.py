@@ -1,13 +1,10 @@
-from app.models.base import BaseModel
+import uuid
+from app import db
+from .place import place_amenity
 
+class Amenity(db.Model):
+    __tablename__ = 'amenities'
+    id = db.Column(db.String(60), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = db.Column(db.String(128), nullable=False)
 
-class Amenity(BaseModel):
-    def __init__(self, name):
-        super().__init__()
-        if not name:
-            raise ValueError("name cannot be empty")
-        if not isinstance(name, str):
-            raise TypeError("name must be a string")
-        if len(name) > 50:
-            raise ValueError("name length must not exceed 50 characters")
-        self.name = name
+    places = db.relationship('Place', secondary=place_amenity, back_populates='amenities')
