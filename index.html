@@ -1,0 +1,44 @@
+<!-- This is the main HTML structure for the Places page -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Places</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <img src="logo.png" alt="Logo" class="logo">
+            <a href="login.html" id="login-link">Login</a>
+            <a href="#" id="logout-link" style="display: none;">Logout</a>
+        </nav>
+    </header>
+
+    <main>
+        <h1 class="main-title">Available Places</h1>
+        <section id="places-list">
+            <div class="filter-section">
+                <label for="price-filter">Max Price:</label>
+                <select id="price-filter">
+                    <option value="All">All</option>
+                    <option value="10">$10</option>
+                    <option value="50">$50</option>
+                    <option value="100">$100</option>
+                </select>
+            </div>
+
+            <div class="places-container" id="places-container">
+                <div class="loading">Loading places...</div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 HBnB Evolution. All rights reserved.</p>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+</html>
