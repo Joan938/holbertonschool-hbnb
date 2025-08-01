@@ -1,0 +1,45 @@
+<!-- This file represents the Place Details page for the HBnB project. -->
+<!-- It includes sections for displaying place details, reviews, and adding new reviews. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Place Details</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <img src="logo.png" alt="Logo" class="logo">
+            <a href="index.html" class="home-button">Home</a>
+            <a href="login.html" id="login-link">Login</a>
+            <a href="#" id="logout-link" style="display: none;">Logout</a>
+        </nav>
+    </header>
+
+    <main>
+        <h1 class="place-title">Loading place details...</h1>
+        
+        <section id="place-details">
+            <div class="loading">Loading place details...</div>
+        </section>
+        
+        <section id="reviews-section">
+            <h2>Reviews</h2>
+            <div id="reviews-list">
+                <div class="loading">Loading reviews...</div>
+            </div>
+        </section>
+        
+        <section id="add-review-section">
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 HBnB Evolution. All rights reserved.</p>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+</html>
