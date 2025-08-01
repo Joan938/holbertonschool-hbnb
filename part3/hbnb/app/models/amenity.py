@@ -1,10 +1,14 @@
-import uuid
-from app import db
-from .place import place_amenity
+from app.models.base_model import BaseModel
+from sqlalchemy import Column, String, DateTime
+from sqlalchemy.orm import relationship
+from app.extensions import db
+""" Amenity Module for the HBNB project """
 
-class Amenity(db.Model):
+class Amenity(BaseModel, db.Model):
+    """ Amenity class to store information about an Amenity """
     __tablename__ = 'amenities'
-    id = db.Column(db.String(60), primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = db.Column(db.String(128), nullable=False)
+    name = db.Column(db.String(128), nullable=False, unique=True)
+    places = relationship("Place", secondary="place_amenities", back_populates="amenities", lazy="select")
 
-    places = db.relationship('Place', secondary=place_amenity, back_populates='amenities')
+    def __repr__(self):
+        return f"<Amenity {self.name}>"

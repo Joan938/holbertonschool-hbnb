@@ -1,59 +1,85 @@
-from flask_restx import Namespace, Resource, fields  # type: ignore
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_restx import Namespace, Resource, fields
 from app.services import facade
+from flask import request, jsonify
+""" API endpoints for user management """
 
 api = Namespace('users', description='User operations')
 
+# Updated user model with password field
 user_model = api.model('User', {
     'first_name': fields.String(required=True, description='First name of the user'),
-    'last_name':  fields.String(required=True, description='Last name of the user'),
-    'email':      fields.String(required=True, description='Email of the user'),
-    'password':   fields.String(required=True, description='Password (min 8 chars)', min_length=8)
+    'last_name': fields.String(required=True, description='Last name of the user'),
+    'email': fields.String(required=True, description='Email of the user'),
+    'password': fields.String(required=True, description='Password of the user')
+})
+
+# User model for updates (password optional)
+user_update_model = api.model('UserUpdate', {
+    'first_name': fields.String(required=True, description='First name of the user'),
+    'last_name': fields.String(required=True, description='Last name of the user'),
+    'email': fields.String(required=True, description='Email of the user')
 })
 
 @api.route('/')
 class UserList(Resource):
+    """Resource for user list"""
+    @api.response(200, 'List of users retrieved successfully')
+    def get(self):
+        """Retrieve all users"""
+        users = facade.get_all_users()
+        user_list = [
+            {
+                'id': user.id, 
+                'first_name': user.first_name, 
+                'last_name': user.last_name, 
+                'email': user.email
+                # Note: Never return password in responses
+            } 
+            for user in users
+        ]
+        return user_list, 200
+
     @api.expect(user_model, validate=True)
     @api.response(201, 'User successfully created')
-    @api.response(400, 'Email already registered or invalid input data')
+    @api.response(400, 'Email already registered')
+    @api.response(400, 'Invalid input data')
     def post(self):
-        """Register a new user (Public access)"""
+        """Register a new user"""
         user_data = api.payload
-        if facade.get_user_by_email(user_data['email']):
+
+        # Check if email is already registered
+        existing_user = facade.get_user_by_email(user_data['email'])
+        if existing_user:
             return {'error': 'Email already registered'}, 400
 
         try:
-            new_user = facade.create_user(user_data)
-            return {'id': new_user.id, 'message': 'User created successfully'}, 201
-        except (ValueError, TypeError, AssertionError) as e:
+            # Create user - the facade should handle password hashing
+            user = facade.create_user(user_data)
+            
+            # Return only user data (never return password)
+            return {
+                'id': user.id,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'email': user.email,
+            }, 201
+
+        except ValueError as e:
             return {'error': str(e)}, 400
-
-    @api.response(200, 'List of users retrieved successfully')
-    @api.response(404, 'No users found')
-    def get(self):
-        """Retrieve all users (Public access)"""
-        users = facade.get_all_users()
-        if not users:
-            return {'message': 'No users found'}, 404
-
-        return [
-            {
-                'id': u.id,
-                'first_name': u.first_name,
-                'last_name': u.last_name,
-                'email': u.email
-            } for u in users
-        ], 200
 
 @api.route('/<user_id>')
 class UserResource(Resource):
+    """Resource for user details"""
+    
     @api.response(200, 'User details retrieved successfully')
     @api.response(404, 'User not found')
     def get(self, user_id):
-        """Get user details by ID (Public access)"""
+        """Get user details by ID"""
         user = facade.get_user(user_id)
         if not user:
             return {'error': 'User not found'}, 404
+
+        # Explicitly exclude password from the response
         return {
             'id': user.id,
             'first_name': user.first_name,
@@ -61,42 +87,42 @@ class UserResource(Resource):
             'email': user.email
         }, 200
 
-    @jwt_required()
-    @api.expect(user_model, validate=True)
+    @api.expect(user_update_model, validate=True)
     @api.response(200, 'User updated successfully')
     @api.response(400, 'Invalid input data')
-    @api.response(401, 'Authentication required')
-    @api.response(403, 'Unauthorized action')
     @api.response(404, 'User not found')
     def put(self, user_id):
-        """Update a user's information (Authentication required - Self only)"""
-        current_user = get_jwt_identity()
-        
-        # Check if the authenticated user is trying to modify their own data
-        if current_user != user_id:
-            return {'error': 'Unauthorized action'}, 403
-        
+        """Update user details"""
+        user_data = api.payload
+
+        # Check if user exists
         user = facade.get_user(user_id)
         if not user:
             return {'error': 'User not found'}, 404
-        
-        updated_data = api.payload.copy()
-        
-        # Prevent modification of email and password
-        if 'email' in updated_data or 'password' in updated_data:
-            return {'error': 'You cannot modify email or password'}, 400
-        
-        # Remove these fields if somehow present
-        updated_data.pop('email', None)
-        updated_data.pop('password', None)
-        
+
+        # Check if email is already taken by another user
+        existing_user = facade.get_user_by_email(user_data['email'])
+        if existing_user and existing_user.id != user_id:
+            return {'error': 'Email already registered'}, 400
+
         try:
-            updated_user = facade.update_user(user_id, updated_data)
+            updated_user = facade.update_user(user_id, user_data)
             return {
                 'id': updated_user.id,
-                'first_name': updated_user.first_name,
-                'last_name': updated_user.last_name,
+                'first_name': updated_user.first_name, 
+                'last_name': updated_user.last_name, 
                 'email': updated_user.email
             }, 200
-        except (ValueError, TypeError, AssertionError) as e:
+        
+        except ValueError as e:
             return {'error': str(e)}, 400
+
+    @api.response(200, 'User deleted successfully')
+    @api.response(404, 'User not found')
+    def delete(self, user_id):
+        """Delete a user by ID"""
+        try:
+            result = facade.delete_user(user_id)
+            return result, 200
+        except ValueError as e:
+            return {"error": str(e)}, 404
